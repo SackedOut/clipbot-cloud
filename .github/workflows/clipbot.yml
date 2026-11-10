@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "*/10 * * * *"   # check To Post every 10 min (GitHub can run a few min late)
   workflow_dispatch:          # "Run workflow" button for a manual run
+    inputs:
+      redo:
+        description: "Re-edit a clip: type its file name (it gets moved from Posted back to To Post)"
+        required: false
+        default: ""
 
 concurrency:
   group: clipbot
@@ -22,8 +27,10 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           DRIVE_REFRESH_TOKEN: ${{ secrets.DRIVE_REFRESH_TOKEN }}
+          REDO: ${{ github.event.inputs.redo }}
         run: |
           pip install -q google-api-python-client google-auth pyyaml pydantic
+          if [ -n "$REDO" ]; then python redo.py "$REDO"; fi
           python check_inbox.py >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-python@v5
@@ -53,4 +60,5 @@ jobs:
           DRIVE_REFRESH_TOKEN: ${{ secrets.DRIVE_REFRESH_TOKEN }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          REDO: ${{ github.event.inputs.redo }}
         run: python cloud_bot.py
