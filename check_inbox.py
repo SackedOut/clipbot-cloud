@@ -10,6 +10,7 @@ cfg = yaml.safe_load(open(cloud_bot.HERE / "config.yaml"))
 inbox = cloud_bot.folder_id(drive, (cfg.get("drive_folders") or {}).get("inbox", "To Post"))
 vids = cloud_bot.list_videos(drive, inbox)
 # only count clips that finished uploading at least a minute ago
+import os
 ready = [v for v in vids
-         if time.time() - datetime.fromisoformat(v["modifiedTime"].replace("Z", "+00:00")).timestamp() > 60]
+         if os.environ.get("REDO") or time.time() - datetime.fromisoformat(v["modifiedTime"].replace("Z", "+00:00")).timestamp() > 60]
 print(f"has_clips={'true' if ready else 'false'}")

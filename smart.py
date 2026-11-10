@@ -11,18 +11,18 @@ log = logging.getLogger("clipbot")
 
 
 class Segment(BaseModel):
-    start: float = Field(description="seconds from the start of the ORIGINAL clip")
-    end: float
+    start: str = Field(description="timestamp in the ORIGINAL clip as M:SS, e.g. 1:07")
+    end: str = Field(description="timestamp as M:SS")
 
 
 class Callout(BaseModel):
-    start: float = Field(description="seconds in the ORIGINAL clip when the text appears")
-    end: float
+    start: str = Field(description="timestamp as M:SS when the text appears")
+    end: str = Field(description="timestamp as M:SS")
     text: str = Field(description="1 to 4 words, ALL CAPS")
 
 
 class Event(BaseModel):
-    time: float = Field(description="seconds in the ORIGINAL clip when it happens")
+    time: str = Field(description="timestamp in the ORIGINAL clip as M:SS, e.g. 1:07")
     what: str = Field(description="short note, e.g. 'headshot kill on Ash', 'round won'")
 
 
@@ -37,20 +37,20 @@ class Plan(BaseModel):
 
 
 PROMPT = """You are editing a PS5 gameplay clip ({duration:.1f} seconds) into a punchy YouTube video.
-The player is whoever's first-person view we see{player}. Watch the WHOLE clip carefully and return JSON only.
+The player is whoever's first-person view we see{player}. Watch the WHOLE clip carefully and return JSON only. All timestamps are M:SS (minutes:seconds) from the start of the clip.
 
-kills: EVERY kill the player gets, with the exact second it happens. Look for: the kill feed entry with the player's name on the left,
+kills: EVERY kill the player gets, with the exact timestamp (M:SS) it happens. Look for: the kill feed entry with the player's name on the left,
   hit/kill markers on the crosshair, "+ points" popups, an enemy dropping right after the player shoots. Do not miss any. Do not list
   teammates' kills or deaths.
 big_moments: clutch banners like "1 VS 3", planting/defusing, "ROUND WON"/"ROUND LOST" screens, the player nearly dying.
-keep: the parts worth keeping as start/end seconds of the ORIGINAL clip, in order.
+keep: the parts worth keeping as start/end timestamps (M:SS) of the ORIGINAL clip, in order.
   - EVERY kill must be inside a kept part, with about 3-4 s of lead-in (the aim/peek) and 1-2 s after.
   - Kills close together go in one part so the fight plays out. Keep the round-win screen briefly if the round is won.
   - Cut everything else: walking, waiting, droning, menus, spectating teammates, kill cams, replays, scoreboards, next round.
 title: 2-5 words, ALL CAPS, about what actually happened, using the real kill count. Examples: "CLEAN 3K ON DEFENSE", "1V3 CLUTCH", "4K ACE".
   If it's 5 kills in R6 it's an "ACE". No hashtags, no emojis, no swearing.
 description: one casual sentence about the play (mention the map if you can see it).
-callouts: 3-8 short on-screen captions (1-4 words, ALL CAPS) timed to key moments, ORIGINAL seconds, each 1-2.5 s, never overlapping.
+callouts: 3-8 short on-screen captions (1-4 words, ALL CAPS) timed to key moments, M:SS timestamps, each 1-2.5 s, never overlapping.
 game: the game's name.
 """
 
@@ -134,16 +134,32 @@ def candidate_models(client, cfg):
     return out[:6]
 
 
+def ts(v):
+    """'1:07' / '1:07.5' / '0:07' / 67 -> seconds."""
+    if isinstance(v, (int, float)):
+        return float(v)
+    v = str(v).strip()
+    parts = v.split(":")
+    try:
+        if len(parts) == 3:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+        if len(parts) == 2:
+            return int(parts[0]) * 60 + float(parts[1])
+        return float(v)
+    except ValueError:
+        return -1.0
+
+
 def clean(plan, duration):
     segs = []
-    kills = sorted(float(k["time"]) for k in plan.get("kills") or [] if 0 <= float(k.get("time", -1)) <= duration)
+    kills = sorted(ts(k["time"]) for k in plan.get("kills") or [] if 0 <= ts(k.get("time", -1)) <= duration)
     for t in kills:  # guarantee each kill is shown with lead-in
         segs.append([max(0.0, t - 4.0), min(duration, t + 2.0)])
     for m in plan.get("big_moments") or []:
         if "won" in str(m.get("what", "")).lower():
-            t = float(m["time"]); segs.append([max(0.0, t - 0.5), min(duration, t + 2.0)])
+            t = ts(m["time"]); segs.append([max(0.0, t - 0.5), min(duration, t + 2.0)])
     for s in plan.get("keep") or []:
-        a, b = max(0.0, float(s["start"])), min(duration, float(s["end"]))
+        a, b = max(0.0, ts(s["start"])), min(duration, ts(s["end"]))
         if b - a >= 0.8:
             segs.append([a, b])
     segs.sort()
@@ -157,10 +173,10 @@ def clean(plan, duration):
         merged = [[0.0, duration]]
 
     calls = []
-    for c in sorted(plan.get("callouts") or [], key=lambda c: float(c["start"])):
+    for c in sorted(plan.get("callouts") or [], key=lambda c: ts(c["start"])):
         text = " ".join(str(c.get("text", "")).upper().split()[:4])
-        a = float(c["start"])
-        b = max(a + 0.8, min(float(c["end"]), a + 2.5))
+        a = ts(c["start"])
+        b = max(a + 0.8, min(ts(c["end"]), a + 2.5))
         if text and (not calls or a >= calls[-1]["end"]):
             calls.append({"start": a, "end": b, "text": text})
 

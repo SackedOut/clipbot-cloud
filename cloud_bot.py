@@ -239,7 +239,7 @@ def main():
 
     from datetime import datetime
     vids = [f for f in list_videos(drive, folders["inbox"])
-            if time.time() - datetime.fromisoformat(f["modifiedTime"].replace("Z", "+00:00")).timestamp() > 60]
+            if os.environ.get("REDO") or time.time() - datetime.fromisoformat(f["modifiedTime"].replace("Z", "+00:00")).timestamp() > 60]
     if not vids:
         log.info("Nothing in To Post.")
         return
