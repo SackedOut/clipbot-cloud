@@ -11,6 +11,8 @@ drive_folders:
 shorts_max_seconds: 60
 
 # ---------- Smart edit (Gemini watches the clip) ----------
+player_name: ""               # your PSN name, so the AI only counts YOUR kills
+ai_fps: 3                     # frames per second the AI watches (higher = catches fast kills)
 smart_edit: true               # AI trims dead time/replays and writes the title
 ai_callouts: false             # true = AI adds "18 HP..." style text; off = captions only when someone talks
 gemini_models: ["gemini-flash-latest", "gemini-2.5-flash"]   # tried in order
@@ -56,8 +58,6 @@ title_templates:
   - "{game} moment you have to see"
   - "This {game} clip is crazy"
 description: |
-  {title}
-
   {game} on PS5. New clips every week, subscribe so you don't miss the next one.
 hashtags: ["#RainbowSixSiege", "#R6", "#R6Siege", "#PS5", "#Gaming"]
 tags: ["gaming", "ps5", "playstation", "rainbow six siege", "r6", "clips"]

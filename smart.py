@@ -21,8 +21,15 @@ class Callout(BaseModel):
     text: str = Field(description="1 to 4 words, ALL CAPS")
 
 
+class Event(BaseModel):
+    time: float = Field(description="seconds in the ORIGINAL clip when it happens")
+    what: str = Field(description="short note, e.g. 'headshot kill on Ash', 'round won'")
+
+
 class Plan(BaseModel):
     game: str
+    kills: List[Event] = Field(description="EVERY kill the player (first-person camera) gets, in order")
+    big_moments: List[Event] = Field(description="other key moments: clutch start (1vX), defuser plant/defuse, round won, near-death escape")
     title: str = Field(description="2 to 5 word on-screen title, ALL CAPS, e.g. 8 HP CLUTCH")
     description: str = Field(description="one casual sentence for the YouTube description")
     keep: List[Segment]
@@ -30,19 +37,21 @@ class Plan(BaseModel):
 
 
 PROMPT = """You are editing a PS5 gameplay clip ({duration:.1f} seconds) into a punchy YouTube video.
-Watch it and return JSON only.
+The player is whoever's first-person view we see{player}. Watch the WHOLE clip carefully and return JSON only.
 
-game: the game's name (e.g. "Rainbow Six Siege").
-title: 2-5 words, ALL CAPS, about what actually happens. Hype but true. Examples: "8 HP CLUTCH", "1V4 ACE", "NO SCOPE SNIPE". No hashtags, no emojis, no swearing.
-description: one casual sentence about the play.
-keep: the parts worth keeping, in order, as start/end seconds of the ORIGINAL clip.
-  - Cut dead time: waiting, walking around with nothing happening, sitting on a defuser/objective, menus, loading.
-  - End shortly after the moment is over. Cut replays, kill cams, "watching teammate" spectating, scoreboards, next-round / ban-phase / lobby screens.
-  - Keep enough lead-in that the play makes sense. Don't chop mid-fight. Prefer 1-3 segments.
-  - If the whole clip is genuinely action, keep it all.
-callouts: 3-8 short on-screen captions (1-4 words, ALL CAPS) timed to key moments, ORIGINAL clip seconds, each 1-2.5 s long, never overlapping.
-  Base them on what is really visible or audible: health numbers on the HUD, kill feed, "3 VS 1" banners, round win screens, a teammate going down. Examples: "DEFUSER IS DOWN", "18 HP...", "8 HP NOW", "LAST ONE", "ROUND WON".
-  Do not invent events. No swearing. Only put callouts inside parts you keep.
+kills: EVERY kill the player gets, with the exact second it happens. Look for: the kill feed entry with the player's name on the left,
+  hit/kill markers on the crosshair, "+ points" popups, an enemy dropping right after the player shoots. Do not miss any. Do not list
+  teammates' kills or deaths.
+big_moments: clutch banners like "1 VS 3", planting/defusing, "ROUND WON"/"ROUND LOST" screens, the player nearly dying.
+keep: the parts worth keeping as start/end seconds of the ORIGINAL clip, in order.
+  - EVERY kill must be inside a kept part, with about 3-4 s of lead-in (the aim/peek) and 1-2 s after.
+  - Kills close together go in one part so the fight plays out. Keep the round-win screen briefly if the round is won.
+  - Cut everything else: walking, waiting, droning, menus, spectating teammates, kill cams, replays, scoreboards, next round.
+title: 2-5 words, ALL CAPS, about what actually happened, using the real kill count. Examples: "CLEAN 3K ON DEFENSE", "1V3 CLUTCH", "4K ACE".
+  If it's 5 kills in R6 it's an "ACE". No hashtags, no emojis, no swearing.
+description: one casual sentence about the play (mention the map if you can see it).
+callouts: 3-8 short on-screen captions (1-4 words, ALL CAPS) timed to key moments, ORIGINAL seconds, each 1-2.5 s, never overlapping.
+game: the game's name.
 """
 
 
@@ -71,7 +80,10 @@ def analyze(path, duration, cfg):
                 try:
                     resp = client.models.generate_content(
                         model=model,
-                        contents=[f, PROMPT.format(duration=duration)],
+                        contents=[types.Part(file_data=types.FileData(file_uri=f.uri, mime_type=f.mime_type),
+                                             video_metadata=types.VideoMetadata(fps=float(cfg.get("ai_fps", 3)))),
+                                  PROMPT.format(duration=duration,
+                                                player=f' (PSN name: {cfg["player_name"]})' if cfg.get("player_name") else "")],
                         config=types.GenerateContentConfig(
                             response_mime_type="application/json",
                             response_schema=Plan,
@@ -124,6 +136,12 @@ def candidate_models(client, cfg):
 
 def clean(plan, duration):
     segs = []
+    kills = sorted(float(k["time"]) for k in plan.get("kills") or [] if 0 <= float(k.get("time", -1)) <= duration)
+    for t in kills:  # guarantee each kill is shown with lead-in
+        segs.append([max(0.0, t - 4.0), min(duration, t + 2.0)])
+    for m in plan.get("big_moments") or []:
+        if "won" in str(m.get("what", "")).lower():
+            t = float(m["time"]); segs.append([max(0.0, t - 0.5), min(duration, t + 2.0)])
     for s in plan.get("keep") or []:
         a, b = max(0.0, float(s["start"])), min(duration, float(s["end"]))
         if b - a >= 0.8:
@@ -131,7 +149,7 @@ def clean(plan, duration):
     segs.sort()
     merged = []
     for a, b in segs:
-        if merged and a <= merged[-1][1] + 0.3:
+        if merged and a <= merged[-1][1] + 3.0:   # join parts that are close so fights flow
             merged[-1][1] = max(merged[-1][1], b)
         else:
             merged.append([a, b])
@@ -147,6 +165,7 @@ def clean(plan, duration):
             calls.append({"start": a, "end": b, "text": text})
 
     title = " ".join(str(plan.get("title", "")).upper().split()[:6]).strip(" #")
+    log.info("  AI found %d kills at %s", len(kills), [round(k, 1) for k in kills])
     return {
         "game": str(plan.get("game", "")).strip()[:60],
         "title": title[:60],
