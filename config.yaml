@@ -45,7 +45,7 @@ fade_out_seconds: 0.5
 music_folder: ""
 
 # ---------- YouTube ----------
-upload: true                # false = edits only (saved to ClipBot Finished)
+upload: false               # false = preview only (video + _youtube.txt in ClipBot Finished). true = auto-post
 privacy: "public"           # public / unlisted / private
 category_id: "20"
 made_for_kids: false
@@ -58,6 +58,6 @@ title_templates:
 description: |
   {title}
 
-  {game} on PS5.
-  Subscribe for more clips.
+  {game} on PS5. New clips every week, subscribe so you don't miss the next one.
+hashtags: ["#RainbowSixSiege", "#R6", "#R6Siege", "#PS5", "#Gaming"]
 tags: ["gaming", "ps5", "playstation", "rainbow six siege", "r6", "clips"]

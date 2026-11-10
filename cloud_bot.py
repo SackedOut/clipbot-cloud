@@ -95,6 +95,13 @@ def upload_to_drive(drive, path, parent):
                                 media_body=media, fields="id").execute()["id"]
 
 
+def upload_text_to_drive(drive, path, parent):
+    from googleapiclient.http import MediaFileUpload
+    media = MediaFileUpload(str(path), mimetype="text/plain")
+    drive.files().create(body={"name": Path(path).name, "parents": [parent]},
+                         media_body=media, fields="id").execute()
+
+
 def move(drive, fid, src, dst):
     drive.files().update(fileId=fid, addParents=dst, removeParents=src, fields="id").execute()
 
@@ -185,14 +192,30 @@ def process(drive, yt, f, folders, cfg, color_idx, tmp):
     log.info("  rendered %s (%.0fs, %s)", out.name, info["duration"], "Short" if vertical else "Video")
 
     upload_to_drive(drive, out, folders["finished"])
+
+    # YouTube title / description / hashtags
+    yt_title = f"{title.title()} | {game}" if game and game.lower() not in title.lower() else title.title()
+    if vertical and "#shorts" not in yt_title.lower() and len(yt_title) <= 90:
+        yt_title = f"{yt_title} #Shorts"
+    tags = list(dict.fromkeys(list(cfg.get("tags") or []) + ([game] if game else [])))
+    hashtags = list(dict.fromkeys((["#Shorts"] if vertical else []) + list(cfg.get("hashtags") or [])))
+    desc = cfg.get("description", "{title}").format(title=yt_title.replace(" #Shorts", ""), game=game or "")
+    if plan and plan.get("description"):
+        desc = plan["description"] + "\n\n" + desc
+    desc = desc.rstrip() + "\n\n" + " ".join(hashtags)
+    preview = (f"TITLE:\n{yt_title}\n\nDESCRIPTION:\n{desc}\n\nTAGS:\n{', '.join(tags)}\n\n"
+               f"FORMAT: {'Short' if vertical else 'Video'} ({info['duration']:.0f}s)\n"
+               f"CAPTIONS: {'yes, speech found' if words else 'none (no one talking)'}\n")
+    log.info("  YouTube preview:\n%s", preview)
+    txt = Path(tmp, out.stem + "_youtube.txt")
+    txt.write_text(preview)
+    upload_text_to_drive(drive, txt, folders["finished"])
+
     if cfg.get("upload", True):
-        yt_title = f"{title.title()} | {game}" if game and game.lower() not in title.lower() else title.title()
-        desc = cfg.get("description", "{title}").format(title=yt_title)
-        if plan and plan.get("description"):
-            desc = plan["description"] + "\n\n" + desc
-        tags = list(cfg.get("tags") or []) + ([game] if game else [])
-        vid = post_youtube(yt, out, yt_title, desc, tags, cfg, vertical)
+        vid = post_youtube(yt, out, yt_title, desc, tags, cfg, False)
         log.info("  POSTED https://youtu.be/%s", vid)
+    else:
+        log.info("  upload is off: saved to ClipBot Finished only")
     move(drive, f["id"], folders["inbox"], folders["posted"])
 
 

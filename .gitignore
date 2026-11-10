@@ -5,3 +5,4 @@ __pycache__/
 *.tmp
 setup.log
 *.command.bak
+push.log
