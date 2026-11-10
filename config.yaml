@@ -45,8 +45,8 @@ fade_out_seconds: 0.5
 music_folder: ""
 
 # ---------- YouTube ----------
-upload: false               # false = preview only (video + _youtube.txt in ClipBot Finished). true = auto-post
-privacy: "public"           # public / unlisted / private
+upload: true                # uploads to YouTube with title, description and tags
+privacy: "private"          # private = a draft only you can see in YouTube Studio. "public" = goes live
 category_id: "20"
 made_for_kids: false
 max_uploads_per_run: 3

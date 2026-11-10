@@ -66,7 +66,7 @@ def analyze(path, duration, cfg):
             raise RuntimeError("Gemini could not process the video")
 
         last_err = None
-        for model in cfg.get("gemini_models") or ["gemini-3.7-flash"]:
+        for model in candidate_models(client, cfg):
             for attempt in range(3):
                 try:
                     resp = client.models.generate_content(
@@ -96,6 +96,30 @@ def analyze(path, duration, cfg):
             client.files.delete(name=f.name)
         except Exception:
             pass
+
+
+def candidate_models(client, cfg):
+    """Configured models first, then whatever current Flash models this key can use."""
+    wanted = list(cfg.get("gemini_models") or [])
+    found = []
+    try:
+        for m in client.models.list():
+            name = (m.name or "").split("/")[-1]
+            acts = getattr(m, "supported_actions", None) or []
+            low = name.lower()
+            if "flash" in low and not any(x in low for x in ("lite", "image", "tts", "audio", "live", "embedding", "thinking-exp")) \
+                    and (not acts or "generateContent" in acts):
+                found.append(name)
+    except Exception as e:
+        log.warning("  could not list Gemini models: %s", str(e)[:150])
+    # newest first: stable names before previews
+    found.sort(key=lambda n: ("preview" in n or "exp" in n, [-int(x) if x.isdigit() else 0 for x in n.replace("-", ".").split(".")]))
+    seen, out = set(), []
+    for n in wanted + found:
+        if n not in seen:
+            seen.add(n); out.append(n)
+    log.info("  Gemini models to try: %s", out[:6])
+    return out[:6]
 
 
 def clean(plan, duration):
