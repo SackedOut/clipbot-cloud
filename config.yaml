@@ -11,7 +11,7 @@ drive_folders:
 shorts_max_seconds: 60
 
 # ---------- Smart edit (Gemini watches the clip) ----------
-player_name: ""               # your PSN name, so the AI only counts YOUR kills
+player_name: "LuhSAC"               # your PSN name, so the AI only counts YOUR kills
 ai_fps: 3                     # frames per second the AI watches (higher = catches fast kills)
 smart_edit: true               # AI trims dead time/replays and writes the title
 ai_callouts: false             # true = AI adds "18 HP..." style text; off = captions only when someone talks
