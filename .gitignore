@@ -1,0 +1,7 @@
+client_secret.json
+token*.json
+__pycache__/
+*.mp4
+*.tmp
+setup.log
+*.command.bak

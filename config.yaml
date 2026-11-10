@@ -1,0 +1,63 @@
+# ClipBot Cloud settings. Edit on GitHub (pencil icon) and commit; next run uses them.
+
+# Folder names in the luhsac04 Google Drive (My Drive). Created automatically.
+drive_folders:
+  inbox: "To Post"
+  posted: "Posted"
+  failed: "Failed"
+  finished: "ClipBot Finished"
+
+# After trimming, clips this long or shorter become vertical Shorts.
+shorts_max_seconds: 60
+
+# ---------- Smart edit (Gemini watches the clip) ----------
+smart_edit: true               # AI trims dead time/replays and writes the title
+ai_callouts: false             # true = AI adds "18 HP..." style text; off = captions only when someone talks
+gemini_models: ["gemini-flash-latest", "gemini-2.5-flash"]   # tried in order
+
+# ---------- Captions / look ----------
+captions: true                 # speech captions (only shows up when someone is talking)
+whisper_model: "small"
+caption_language: "en"
+caption_font: "Arial Black"   # falls back to a heavy sans on the cloud machine (the look you approved)
+caption_words_per_line: 3
+caption_color: "&H00FFFFFF"
+caption_highlight_color: "&H0000FF66"
+caption_censor: ["fuck", "shit", "bitch"]
+highlight_palette:            # rotates every video (&H00BBGGRR)
+  - "&H0000FF66"   # lime green
+  - "&H0000E5FF"   # yellow
+  - "&H00FFE500"   # cyan
+  - "&H00008AFF"   # orange
+  - "&H00A53EFF"   # hot pink
+  - "&H002D2DFF"   # red
+  - "&H00FF6BA8"   # purple
+
+title_font: "Bebas Neue"
+title_color: "&H00FFFFFF"
+title_size: 150
+title_highlight_last_words: 1
+show_title_on_shorts: true
+shorts_gameplay_zoom: 1.25
+intro_punch_zoom: true
+fade_in_seconds: 0.25
+fade_out_seconds: 0.5
+music_folder: ""
+
+# ---------- YouTube ----------
+upload: true                # false = edits only (saved to ClipBot Finished)
+privacy: "public"           # public / unlisted / private
+category_id: "20"
+made_for_kids: false
+max_uploads_per_run: 3
+
+default_game: "Rainbow Six Siege"
+title_templates:
+  - "{game} moment you have to see"
+  - "This {game} clip is crazy"
+description: |
+  {title}
+
+  {game} on PS5.
+  Subscribe for more clips.
+tags: ["gaming", "ps5", "playstation", "rainbow six siege", "r6", "clips"]
