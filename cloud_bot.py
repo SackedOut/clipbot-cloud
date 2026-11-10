@@ -254,6 +254,9 @@ def main():
             try:
                 process(drive, yt, f, folders, cfg, color_idx, tmp)
                 color_idx += 1
+            except smart.AIBusy as e:
+                log.warning("AI is busy right now (%s). Leaving %s in To Post; next run will try again.", e, f["name"])
+                return
             except Exception as e:
                 log.exception("FAILED %s: %s", f["name"], e)
                 if "quota" in str(e).lower():

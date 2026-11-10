@@ -15,7 +15,7 @@ player_name: "LuhSAC"               # your PSN name, so the AI only counts YOUR 
 ai_fps: 3                     # frames per second the AI watches (higher = catches fast kills)
 smart_edit: true               # AI trims dead time/replays and writes the title
 ai_callouts: false             # true = AI adds "18 HP..." style text; off = captions only when someone talks
-gemini_models: ["gemini-flash-latest", "gemini-2.5-flash"]   # tried in order
+gemini_models: ["gemini-3.8-flash", "gemini-3.5-flash"]   # tried in order
 
 # ---------- Captions / look ----------
 captions: true                 # speech captions (only shows up when someone is talking)

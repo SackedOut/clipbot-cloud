@@ -55,6 +55,10 @@ game: the game's name.
 """
 
 
+class AIBusy(Exception):
+    """Gemini stayed busy; leave the clip for the next run."""
+
+
 def analyze(path, duration, cfg):
     """Returns a cleaned-up plan dict, or None if the AI step isn't available."""
     key = os.environ.get("GEMINI_API_KEY")
@@ -75,8 +79,16 @@ def analyze(path, duration, cfg):
             raise RuntimeError("Gemini could not process the video")
 
         last_err = None
-        for model in candidate_models(client, cfg):
-            for attempt in range(3):
+        models = candidate_models(client, cfg)
+        dead = set()
+        for rnd in range(4):  # Gemini is often "busy"; wait it out instead of making a lazy edit
+            if rnd:
+                wait = 45 * rnd
+                log.info("  all models busy, waiting %ds before round %d", wait, rnd + 1)
+                time.sleep(wait)
+            for model in models:
+                if model in dead:
+                    continue
                 try:
                     resp = client.models.generate_content(
                         model=model,
@@ -93,16 +105,13 @@ def analyze(path, duration, cfg):
                     plan = json.loads(resp.text)
                     log.info("  AI plan from %s", model)
                     return clean(plan, duration)
-                except Exception as e:  # rate limit, model not available, bad json...
+                except Exception as e:  # busy, rate limit, model gone, bad json...
                     last_err = e
                     msg = str(e)
-                    log.warning("  %s attempt %d failed: %s", model, attempt + 1, msg[:200])
-                    if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
-                        time.sleep(20 * (attempt + 1))
-                        continue
-                    break  # try next model
-        log.warning("  AI edit unavailable, falling back to plain edit (%s)", str(last_err)[:200])
-        return None
+                    log.warning("  %s round %d failed: %s", model, rnd + 1, msg[:160])
+                    if "404" in msg or "NOT_FOUND" in msg:
+                        dead.add(model)
+        raise AIBusy(str(last_err)[:200])
     finally:
         try:
             client.files.delete(name=f.name)
